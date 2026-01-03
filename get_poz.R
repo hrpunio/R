@@ -14,6 +14,7 @@
 dir_name <- './poz/' ## katalog z plikami xlsx
 
 wszystkie_dane <- data.frame()
+
 pliki <- list.files(path = dir_name, pattern = "\\.xlsx$", full.names = TRUE)
 
 for (plik in pliki) {
@@ -23,21 +24,29 @@ for (plik in pliki) {
   ##print (paste("==>", yrmon))
   
   df <- read_excel(plik, sheet = "Tabela 1", 
-                 na='NA', ## domyślnie jest NA
-                 skip=4,
-                 ## jakiś geniusz wprowadził <5 od 2020 roku
-                 col_types = c('text', 'text', 'text', 'text', 'text', 'text', 'text', 'text',
-                               'text', 'text', 'text', 'text'),
-                 col_names = c('icd', 'rozpoznanie', 'liczba', 'wartosc',
-                               'skip1', 's2', 's3',  's4', 's5', 's6', 's7', 's8' )
+           na='NA', ## domyślnie jest NA
+           skip=4,
+           ## jakiś geniusz wprowadził <5 od 2020 roku
+           col_types = c('text', 'text', 'text', 'text', 'text', 'text', 'text', 'text',
+              'text', 'text', 'text', 'text'),
+              col_names = c('icd', 'rozpoznanie', 'liczba.porad', 'liczba.pacjentow',
+                'skip1', 's2', 's3',  's4', 's5', 's6', 's7', 's8' )
   ) |>
   ## Dodaj datę
   mutate (ym = yrmon ) |>
   ## zamiń NA na zero
-    mutate(liczba = as.numeric(parse_number(liczba)),
-           wartosc = as.numeric(parse_number(wartosc))) |>
+  ## < 5 oznacza mniej niż 5; znak < występuje tylko w tym kontekście
+  ## wstawiamy zatem 4
+    mutate( liczba.porad = gsub("<\\s*([0-9]+)", "4", liczba.porad),
+            liczba.pacjentow = gsub("<\\s*([0-9]+)", "4", liczba.pacjentow ),
+            liczba.porad = as.numeric(liczba.porad),
+            liczba.pacjentow = as.numeric(liczba.pacjentow)
+    ) |>
+  ## Poniższe to błąd zmieni na 5 a powinno być 4
+  ##  liczba.porad = as.numeric(parse_number(liczba.porad)),
+  ##       liczba.pacjentow = as.numeric(parse_number(liczba.pacjentow))) |>
   ##
-  mutate(across(c(liczba, wartosc), ~replace_na(.x, 0))) |>
+  mutate(across(c(liczba.porad, liczba.pacjentow), ~replace_na(.x, 0))) |>
   ##
   ## Podziel kolumny icd i rozpoznanie
   mutate(icd = sub(" ", "@", icd )) |>
@@ -47,7 +56,7 @@ for (plik in pliki) {
   ##
   separate(ym, into = c("year", "month"), sep = "_", extra = "merge") |>
   ##
-  select (year, month, icd_code, icd_name, r_code, r_name, liczba, wartosc)
+  select (year, month, icd_code, icd_name, r_code, r_name, liczba.porad, liczba.pacjentow)
 
   wszystkie_dane <- bind_rows(wszystkie_dane, df) 
   
@@ -55,17 +64,22 @@ for (plik in pliki) {
 
 icd <- unique(wszystkie_dane |> arrange(icd_code) |>
                 select (icd_code, icd_name))
-rozpoznanie <- unique(wszystkie_dane |> select (r_code, r_name))
+rozpoznanie <- unique(wszystkie_dane |> 
+                        arrange(r_code) |>
+                        select (r_code, r_name))
 
 ## 
-
+##
 wszystkie_dane_short <- wszystkie_dane |>
-  select (year, month, icd_code, r_code, liczba, wartosc)
+  select (year, month, icd_code, r_code, liczba.porad, liczba.pacjentow)
 
 write.table(wszystkie_dane_short, "raporty_poz.csv", sep=';', 
             quote = F,
             row.names = F)
 
+##
 write.table(icd, "icd_codes.csv", sep=';',  quote = TRUE, row.names = F)
-
+##
 write.table(rozpoznanie, "rozpoznanie_codes.csv", sep=';',  quote = TRUE, row.names = F)
+
+## koniec
