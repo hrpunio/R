@@ -1,0 +1,314 @@
+##---
+##title: 'Postawa wobec statystyki'
+## Tomasz Przechlewski email: t.plata-przechlewski@psw.kwidzyn.edu.pl
+##---
+
+require('ggplot2')
+require('dplyr')
+require('tidyr')
+library("knitr")
+library("readr")
+library("rstatix")
+library(readr)
+library("googlesheets4")
+
+
+## dane
+col.names = c("time",
+              "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10",
+              "p1", "p2r", 'p3r', 'p4', 'p5r', 'p6r', 'p7',
+              'p8', 'p9r', "p10r", "p11r", 'p12r', 'p13', 'p14r', 'p15', 'p16r', 'p17',
+              'p18r', 'p19r', "p20r", "p21r", 'p22r', 'p23', 'p24', 'p25r', 'p26r', 'p27r', 'p28r',
+              'matura', 'plec', 'wiek', 'odleglosc', 'kierunek', 'miejsce')
+
+googlesheets4::gs4_deauth()
+d0 <- read_sheet('1tKPr2p-oIIAH2VzbQpRv1ZtzmIQTWXQwtxaUCMmBuWc',
+                 skip = 1,
+                 col_types = 'ccccccccccccccccccccccccccccccccccccccccccccc',
+                 col_names = col.names ) %>%
+  filter ( as.POSIXct(time) > as.POSIXct('2024/10/01 0:00:00 AM') ) |>
+  select (-one_of('time'))
+
+d1 <- d0 %>%
+  mutate(across(c("s1", "s2", 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10'),
+     ~ case_when (
+    . == "zdecydowanie nie" ~ 1,
+    . == "nie"              ~ 2,
+    . == "ani tak/ani nie"  ~ 3,
+    . == "tak"              ~ 4,
+    . == "zdecydowanie tak" ~ 5
+   ))) |>
+  mutate(across(c("p1", "p2r", 'p3r', 'p4', 'p5r', 'p6r', 'p7',
+                  'p8', 'p9r', "p10r", "p11r", 'p12r', 'p13', 'p14r', 'p15', 'p16r', 'p17',
+                  'p18r', 'p19r', "p20r", "p21r", 'p22r', 'p23', 'p24', 'p25r', 'p26r', 'p27r', 'p28r'
+  ), ~ case_when(
+    . == "Zdecydowanie nie zgadzam się" ~ 1,
+    . == "Nie zgadzam się"              ~ 2,
+    . == "Raczej nie zgadzam się"  ~ 3,
+    . == "Nie mam zdania"  ~ 4,
+    . == "Raczej zgadzam się"  ~ 5,
+    . == "Zgadzam się" ~ 6,
+    . == "Zdecydowanie się zgadzam" ~ 7
+  )))  |>
+  ##mutate(matura = na_if(matura, -1)) |>
+  mutate (wiek = as.numeric(wiek), odleglosc=as.numeric(odleglosc) ) |>
+  ## na okoliczność błędu
+  filter (wiek < 99) |>
+  mutate ( p2 = 8 - p2r,    p3 = 8 - p3r,   p5 = 8 - p5r,    p6 = 8 - p6r,
+           p9 = 8 - p9r,   p10 = 8 - p10r,  p11 = 8 - p11r,  p12 = 8 - p12r,
+           p14 = 8 - p14r, p16 = 8 - p16r,
+           p18 = 8 - p18r,
+           p19 = 8 - p19r, p20 = 8 - p20r,  p21 = 8 - p21r,  p22 = 8 - p22r,
+           p25 = 8 - p25r, p26 = 8 - p26r,  p27 = 8 - p27r,  p28 = 8 - p28r ) |>
+  mutate (pws = p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9 + p10 +
+            p11 + p12 + p13 + p14 + p15 + p16 + p17 + p18 + p19  + p20 +
+            p21 + p22 + p23 + p24 + p25 + p26 + p27 + p28,
+          ##
+          samoskutecznosc = s1 + s2 + s3 + s3 + s5 +s6 +s7 +s8 +s9 + s10,
+          pws.afekt = p1 + p2 + p11 + p14 + p15 + p21,
+          pws.kompetencje = p3 + p9 + p20 + p23 + p24 + p27,
+          pws.wartosc = p5 + p7 + p8 + p10 + p12 + p13 + p16 + p19 + p25,
+          pws.trudnosc = p4 + p6 + p17 + p18 + p22 + p26 + p28,
+          ####
+          pws.afekt.sr = pws.afekt / 6,
+          pws.kompetencje.sr = pws.kompetencje / 6,
+          pws.wartosc.sr = pws.wartosc / 9,
+          pws.trudnosc.sr = pws.trudnosc / 7
+  ) |>
+  select (samoskutecznosc, pws,
+          sex=plec,
+          matura, wiek, kierunek, odleglosc, miejsce,
+          pws.afekt, pws.kompetencje, pws.wartosc,
+          pws.trudnosc, pws.afekt.sr,  pws.kompetencje.sr, pws.wartosc.sr, pws.trudnosc.sr)
+#  |>
+#  mutate( staz=case_when(staz >= 10 ~ "d",  staz >= 3 ~ "s",
+#                         TRUE ~ "m") )
+```
+
+#
+#Postawę zmierzono za pomocą 28 pytań, które mierzą cztery różne aspekty postawy:
+#afekt, kompetencje poznawcz, wartość i trudność. Mierzymy pozytywną postawę
+#stąd pytania 2, 3, 5, 6, 9--12, 14, 16, 18--22 oraz 25--28
+#są mierzone za pomocą skali odwróconej:
+#
+#**Afekt**
+#
+#1.  Polubię statystykę 
+#2.  Będę się czuł niepewnie gdy będę musiał rozwiązywać zadania statystyczne. (r)
+#11. Podczas kolokwiów ze statystyki będę sfrustrowany (r)
+#14. Będę zestresowany na zajęciach ze statystyki (r)
+#15. Chętnie wezmę udział w zajęciach ze statystyki 
+#21. Statystyka mnie przeraża (r)
+#
+#**Kompetencje poznawcze**
+#
+#3.  Mój sposób myślenia powoduje że mam kłopoty ze zrozumieniem statystyki (r)
+#9.  Nie mam pojęcia o co chodzi w statystyce (r)
+#20. Zajmując się statystyką popełniam wiele błędów matematycznych (r)
+#23. Mogę nauczyć się statystyki 
+#24. Zrozumiem wzory statystyczne 
+#27. Zrozumienie pojęć ze statystyki będzie dla mnie trudne (r)
+#
+#**Wartość**
+#
+#5.  Statystyka jest bezwartościowa (r)
+#7.  Statystyka powinna być obowiązkowym przedmiotem na studiach 
+#8.  Znajomość statystyki ułatwi mi znalezienie pracy 
+#10. Profesjonalista nie potrzebuje znajomości statystyki (r)
+#12. Za wyjątkiem wykorzystania w pracy zawodowej statystyka jest bezużyteczna (r)
+#13. Wykorzystuję statystykę w codziennym życiu 
+#16. Na co dzień rzadko się widzi wykorzystanie statystyki (r)
+#19. Statystyka nie przyda się w moim zawodzie (r)
+#25. Statystyka nie ma żadnego znaczenia w moim życiu (r)
+#
+#**Trudność** (a w zasadzie **Łatwość**)
+#
+#4.  Wzory statystyczne są łatwe do zrozumienia 
+#6.  Statystyka jest skomplikowana (r)
+#17. Większość ludzi szybko  uczy się statystyki 
+#18. Nauczenie się statystyki wymaga dużej dyscypliny (r)
+#22. Statystyka wymaga żmudnych obliczeń (r)
+#26. Statystyka jest wysoce specjalistyczna (r)
+#28. Większość ludzi musi nauczyć się nowego sposobu myślenia aby zajmować się statystyką (r)
+#
+#Jeżeli osoba uważa statystykę za superłatwą to wartość PwS wyniesie `r 28 * 7`; 
+#jeżeli osoba uważa statystykę za supertrudną to PwS=`r 28 *1`.
+#
+afekt.sr <- mean(d1$pws.afekt.sr)
+kompetencje.sr <- mean(d1$pws.kompetencje.sr)
+wartosc.sr <- mean(d1$pws.wartosc.sr)
+trudnosc.sr <- mean(d1$pws.trudnosc.sr)
+
+### Płeć respondentów
+
+sex.f <- d1 %>%
+  select (sex) %>%
+  group_by(sex)%>%
+  summarize(n=n())%>%
+  mutate(prop=n/sum(n) * 100 )
+
+sex.t <- kable(sex.f, col.names = c('płeć', 'n', '%'))
+sex.t
+
+p.1 <- ggplot(sex.f, aes(x = reorder(sex, n), y = n )) +
+  ggtitle("Badani wg płci") +
+  xlab("") + ylab("%") +
+  geom_bar(position = 'dodge', stat = 'identity', fill = "steelblue") +
+  geom_text(data=sex.f, aes(label=sprintf("%.2f", prop), y= prop), hjust=1.5, color="white" ) +
+  #scale_x_discrete (breaks=var.names,  labels=var.labels) +
+  coord_flip()
+p.1
+
+p3 <- d1 |> ggplot(aes(x = wiek)) +
+  geom_histogram(binwidth = 3, color='black', fill=default_cyan) +
+  ggtitle("Rozkład wieku")
+p3
+
+## Samoskuteczność
+
+p1 <- d1 |> ggplot(aes(x = samoskutecznosc)) +
+  geom_histogram(binwidth = 2, color='black', fill=default_cyan) +
+  ylab("pkt") +
+  ggtitle("Rozkład sumy rang samoksuteczności")
+p1
+
+## Rozkład wartości zmiennej pn *Postawa wobec statystyki*
+
+median <- median(d1$pws)
+
+q1 <- ggplot(d1, aes(x=pws)) +
+  ##geom_vline(xintercept = true.mean.w, colour="forestgreen", size=.4) +
+  geom_histogram(binwidth=8, alpha=.5, fill="steelblue") +
+  ggtitle("Rozkład wartości PwS", subtitle='rozpiętość przedziału 8')
+q1
+
+p33 <- d1 |> select (afekt = pws.afekt.sr,
+                    kompetencje = pws.kompetencje.sr,
+                    wartosc = pws.wartosc.sr,
+                    trudnosc = pws.trudnosc.sr) |>
+  pivot_longer(cols = everything(), names_to = 'aspekt', values_to = 'v' ) |>
+  ggplot(aes(y=v, x=aspekt )) + 
+  geom_boxplot() + 
+  ylab("#") +
+  ggtitle("") +
+  xlab('')
+p33
+
+## Płeć a PwS
+
+d2 <- d1 |>
+  group_by(sex) |>
+  summarise(m = mean(pws), me = median(pws), 
+            q1 = quantile(pws, probs=.25, na.rm  =TRUE),
+            q3 = quantile(pws, probs=.75, na.rm =TRUE),
+            sd = sd(pws)
+  )
+t1 <- kable(d2, digits=2, booktabs = TRUE)
+t1
+
+q1 <- d1 |> 
+ggplot(aes(x=pws)) +
+  ##geom_vline(xintercept = true.mean.w, colour="forestgreen", size=.4) +
+  geom_histogram(binwidth=8, alpha=.5 ) +
+  facet_wrap(~sex) +
+  ggtitle("Rozkład wartości PwS", subtitle='rozpiętość przedziału 8')
+q1
+
+
+mean.afekt.K <- d1 |> group_by (sex) |> summarise (m = mean(pws.afekt.sr, na.rm=TRUE))
+kable(mean.afekt.K)
+
+mean.kompetencje.K <- d1 |> group_by (sex) |> summarise (m = mean(pws.kompetencje.sr))
+kable(mean.kompetencje.K)
+
+
+mean.wartosc.K <- d1 |> group_by (sex) |> summarise (m = mean(pws.wartosc.sr))
+kable(mean.wartosc.K)
+
+mean.trudnosc.K <- d1 |> group_by (sex) |> summarise (m = mean(pws.trudnosc.sr))
+kable(mean.trudnosc.K)
+
+
+## Wiek a PwS
+
+m1 <- lm(data=d1, pws ~ wiek )
+summary(m1)
+
+## Kierunek a PwS
+
+ex.kierunek.f <- d1 %>%
+  select (pws, kierunek) %>%
+  group_by(kierunek)%>%
+  summarize(m=mean(pws))
+
+ex.kierunek.t <- kable(ex.kierunek.f, col.names = c('kierunek', 'średni pws'))
+
+ex.kierunek.t
+
+## Czy istnieje zależność między PwS oraz płcią?
+
+ttest <- d1 %>%  t_test(pws ~ sex) %>%
+  select(group1, group2, n1, n2, statistic, p)
+pval.mp <- ttest$p
+kable(ttest, col.names = c('Grupa1', 'Grupa2', 'n1', 'n2', 't', 'p'), booktabs = TRUE)
+
+## spr. założenia
+sw.table <- d1 %>%
+  group_by(sex) %>%
+  shapiro_test(pws) %>% select(sex, statistic, p)
+
+kable(sw.table, col.names = c('płeć', 'S-W', 'p'), booktabs = TRUE)
+
+## Czy istnieje zależność pomiędzy `pws.trudnosc` a wiekiem?
+
+lm.0 <- lm(data=d1, pws.trudnosc ~ wiek ); 
+lmc <- coef(lm.0)
+coeff_b <- lmc["weight"]
+lmr <- summary(lm.0)$r.squared
+
+lmsum0 <- summary(lm.0)
+lm.0.coef <- as.data.frame(coef(summary(lm.0)))
+
+lm.0.ci <- round(confint(lm.0), 2)
+
+lm_ci_txt <- sprintf ("%s %s", format(lm.0.ci[,1], decimal.mark=",", digits=3), format(lm.0.ci[,2], decimal.mark=",", digits=3) )
+
+## zestawienie tabelaryczne wyników
+lm.0.coef.df <- tibble::rownames_to_column(lm.0.coef, "Parametr") %>%
+  mutate(ci=lm_ci_txt)
+
+kable(lm.0.coef.df, row.names = F, digits=3,
+      col.names = c('Zmienna', 'B', 'SE', 'z', 'p', 'CI95'), booktabs = TRUE )
+
+
+## Wiek a `psw.wartosc`
+
+lm.0 <- lm(data=d1, pws.wartosc ~ wiek ); 
+lmc <- coef(lm.0)
+coeff_b <- lmc["weight"]
+lmr <- summary(lm.0)$r.squared
+
+lmsum0 <- summary(lm.0)
+lm.0.coef <- as.data.frame(coef(summary(lm.0)))
+
+lm.0.ci <- round(confint(lm.0), 2)
+
+lm_ci_txt <- sprintf ("%s %s", format(lm.0.ci[,1], decimal.mark=",", digits=3), format(lm.0.ci[,2], decimal.mark=",", digits=3) )
+
+## zestawienie tabelaryczne wyników
+lm.0.coef.df <- tibble::rownames_to_column(lm.0.coef, "Parametr") %>%
+  mutate(ci=lm_ci_txt)
+
+kable(lm.0.coef.df, row.names = F, digits=3,
+      col.names = c('Zmienna', 'B', 'SE', 'z', 'p', 'CI95'), booktabs = TRUE )
+
+## pws a samoskutecznosc
+
+m1 <- lm(pws ~ samoskutecznosc, data=d1)
+summary(m1)
+
+##
+ggplot(d1, aes(x=samoskutecznosc, y=pws)) + geom_point()
+
+m2 <- lm(pws ~ samoskutecznosc + sex, data=d1)
+summary(m2)
