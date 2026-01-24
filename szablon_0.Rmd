@@ -1,0 +1,42 @@
+---
+title: "TYTUŁ"
+author: "TP"
+date: "DATA"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+## dołączenie niezbędnych bibliotek
+library("tidyverse")
+library("knitr")
+library('scales')
+
+```
+
+# Analiza szeregów czasowych
+
+## Pojęcia wstępne
+
+treść
+
+```{r}
+## Kod R
+```
+
+treść
+
+```{r}
+## Kod R
+a <- 5
+```
+
+można wstawić kod R wewnątrza akapitu, np `r a`
+
+## Zakończenie
+
+??
+
