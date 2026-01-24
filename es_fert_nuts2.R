@@ -22,7 +22,8 @@ ex <- c('CH', 'LU', 'ME', 'MK', 'MT', 'RS', 'CY')
 
 fert_0 <- get_eurostat("tgs00100",  stringsAsFactors = FALSE) |>
   select (geo, TIME_PERIOD, values) |>
-  mutate (year = as.numeric(substr(TIME_PERIOD, 1, 4))) |>
+  mutate (
+    year = as.numeric(substr(TIME_PERIOD, 1, 4))) |>
   ## kolumna member = pierwsze dwa znaki z kolumny geo (zawierającej 4 znakowy
   ## identyfikator NUTS)
   mutate (member = substr(geo, 1, 2)) |>
@@ -30,19 +31,23 @@ fert_0 <- get_eurostat("tgs00100",  stringsAsFactors = FALSE) |>
   filter (! member %in% ex )
 
 year.min <- min(fert_0$year)
+year.max <- max(fert_0$year)
 
 ## Tylko polska
 fert_0_pl <- fert_0 |> filter (member == 'PL') 
 
 ## Roku 2023 (najnowsze dane)
 fert_2023 <- fert_0 |> filter (year == 2023)
+
 median.fert <- median(fert_2023$values)
 
 p0 <- ggplot(fert_2023, aes(x=member, y=values )) + 
-    ggtitle("Fertility rate by NUTS2 regions (2023)", subtitle="Eurostat: tgs00100 table") +
+  geom_boxplot( color='deeppink')  + 
+  xlab("kraj") + 
+  ylab("tfr") +
+  ggtitle("Fertility rate by NUTS2 regions (2023)", subtitle="Eurostat: tgs00100 table") +
   geom_hline(yintercept = 2.15, color="navyblue", alpha=.25, linewidth=1.2) +
-  geom_hline(yintercept = median.fert, color="forestgreen", alpha=.25, linewidth=1.2) +
-  geom_boxplot(color='deeppink') + ylab("") + xlab("");
+  geom_hline(yintercept = median.fert, color="forestgreen", alpha=.25, linewidth=1.2)
 
 p0
 ## zapisanie na dysk w formacie PNG
@@ -52,10 +57,12 @@ ggsave(p0, file="eurofert.png", width=10)
 fert_0_pl_xx <- fert_0_pl |> 
   filter (year == 2012 | year == 2018 | year == 2023)
 
+## Wykres punktowy
 p2 <- fert_0 |> 
   filter (year == 2012 | year == 2018 | year == 2023) |>
+  ##
   ggplot(aes(y=values, x=as.factor(year) )) +
-  geom_jitter(width = 0.1, alpha=.25) +
+    geom_jitter(width = 0.1, alpha=.25) +
   ylab("#") +
   ggtitle("??") +
   xlab('') +
@@ -83,7 +90,7 @@ p3 <- fert_0 |>
 p3
 
 ## źle nie ten poziom
-##
+## ------------------
 p3 <- fert_0 |> filter (member %in% my.members) |>
   ggplot(aes(y=values, x=year, color=member )) +
   geom_line() +
